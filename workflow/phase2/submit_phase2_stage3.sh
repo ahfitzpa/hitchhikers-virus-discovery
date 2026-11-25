@@ -11,7 +11,7 @@
 #SBATCH --partition=shared
 #SBATCH --cpus-per-task=4
 #SBATCH --time=1-00:00:00
-#SBATCH --output=$PWD/workflow/phase2/logs/stage3_%j.out
+#SBATCH --output=logs/stage3_%j.out
 #SBATCH --mail-type=END,FAIL
 set -uo pipefail
 cd "${SLURM_SUBMIT_DIR:-$PWD/workflow/phase2}"

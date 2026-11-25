@@ -83,6 +83,30 @@ class TestCoreScriptLogic(unittest.TestCase):
         self.assertNotIn(" ", cleaned)
         self.assertNotIn("/", cleaned)
 
+    def test_no_sql_string_interpolation_in_execute_calls(self) -> None:
+        for p in (P1_SCRIPTS / "01.centroid_query.py", P1_SCRIPTS / "align_matrix.py"):
+            tree = ast.parse(p.read_text(encoding="utf-8"))
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "execute":
+                    self.assertGreaterEqual(
+                        len(node.args),
+                        2,
+                        f"Expected parameterized cur.execute(sql, params) in {p.name}:{node.lineno}",
+                    )
+                    self.assertNotIsInstance(
+                        node.args[0],
+                        (ast.JoinedStr, ast.BinOp),
+                        f"SQL string interpolation detected in {p.name}:{node.lineno}",
+                    )
+
+    def test_no_unexpanded_pwd_in_sbatch_directives(self) -> None:
+        for sh in REPO_ROOT.rglob("*.sh"):
+            if ".git" in sh.parts:
+                continue
+            for lineno, line in enumerate(sh.read_text(encoding="utf-8", errors="ignore").splitlines(), 1):
+                if line.startswith("#SBATCH"):
+                    self.assertNotIn("$PWD", line, f"Unexpanded $PWD in #SBATCH at {sh.name}:{lineno}")
+
 
 if __name__ == "__main__":
     unittest.main()

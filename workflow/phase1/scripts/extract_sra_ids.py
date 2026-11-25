@@ -6,33 +6,41 @@ first column of `snakemake.input.hits` and writes one accession per line to
 `snakemake.output[0]`.
 """
 
-import pandas as pd
-import sys
+import os
+import tempfile
+from pathlib import Path
 
-# Snakemake injects this object automatically
-hits_path = snakemake.input.hits
-output_path = snakemake.output[0]
+import pandas as pd
+
+
+def _atomic_write_lines(dest: str | Path, lines: list[str]) -> None:
+    """Write lines to a sibling temp file and atomically rename into place."""
+    dest_path = Path(dest)
+    dest_path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_name = tempfile.mkstemp(prefix=f".{dest_path.name}.", suffix=".tmp", dir=dest_path.parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            for line in lines:
+                fh.write(f"{line}\n")
+        os.replace(tmp_name, dest_path)
+    except BaseException:
+        if os.path.exists(tmp_name):
+            os.unlink(tmp_name)
+        raise
+
+
+hits_path = Path(snakemake.input.hits)
+output_path = Path(snakemake.output[0])
 
 try:
-    # 1. Read the hits file (Assuming it remains a tab-delimited file without headers)
-    # If this hits.tsv file structure hasn't changed, this part is fine.
-    df = pd.read_csv(hits_path, sep="\t", 
-                     names=["query", "target", "pident", "alnlen", "evalue"],
-                     header=None) 
-    
-    # 2. Extract IDs (The 'query' column in hits.tsv still likely looks like 'ERR12345_...')
-    # This remains the same to extract the SRA run_id from the MMseqs query
-    ids = df["query"].str.split("_").str[0].dropna().unique()
-    
-    # 3. Write output in a clean format
-    with open(output_path, "w") as f:
-        # We keep this as a simple list because it is consumed by downstream logic
-        for run_id in ids:
-            f.write(str(run_id) + "\n")
-            
+    df = pd.read_csv(
+        hits_path,
+        sep="\t",
+        names=["query", "target", "pident", "alnlen", "evalue"],
+        header=None,
+    )
+    ids = [str(run_id) for run_id in df["query"].astype(str).str.split("_").str[0].dropna().unique()]
 except pd.errors.EmptyDataError:
-    with open(output_path, "w") as f:
-        pass
-except Exception as e:
-    print(f"Error parsing {hits_path}: {e}")
-    sys.exit(1)
+    ids = []
+
+_atomic_write_lines(output_path, ids)

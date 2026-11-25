@@ -151,8 +151,8 @@ def _existing(pats) -> dict[str, int]:
             if _wild_re(p).match(path):
                 try:
                     found[path] = os.path.getsize(path) if os.path.isfile(path) else -1
-                except OSError:
-                    pass
+                except OSError as exc:
+                    print(f"[retention] WARNING: could not stat {path}: {exc}", file=sys.stderr)
     return found
 
 
@@ -204,15 +204,18 @@ def retire(pattern: str, reason: str) -> int:
     led = _read_ledger()
     gone = [p for p in led if fnmatch.fnmatch(p, pattern)]
     now = dt.datetime.now().isoformat(timespec="seconds")
+    os.makedirs(os.path.dirname(RETIRED), exist_ok=True)
     with open(RETIRED, "a") as fh:
         for p in gone:
             fh.write(f"{now}\t{p}\t{reason}\n")
             led.pop(p)
-    with open(LEDGER, "w", newline="") as fh:
+    tmp = LEDGER + ".tmp"
+    with open(tmp, "w", newline="") as fh:
         w = csv.writer(fh, delimiter="\t")
         w.writerow(["path", "first_seen", "size"])
         for p in sorted(led):
             w.writerow([p, *led[p]])
+    os.replace(tmp, LEDGER)
     print(f"[retention] retired {len(gone)} ledger entr(y/ies) matching {pattern}: {reason}", file=sys.stderr)
     return 0
 
