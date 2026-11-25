@@ -1,171 +1,188 @@
+#!/usr/bin/env python3
+"""Generate a clean, publication-grade SVG workflow diagram for Phase 2.
+
+Run:
+    python3 plots/phase2_flow_diagram.py
+Writes:
+    plots/phase2_flow_diagram.svg
 """
-Phase 2 (assembly & annotation) pipeline flow diagram.
+from __future__ import annotations
 
-Draws the actual current rule structure of workflow/phase2/Snakefile_phase2
-and its included rules/*.smk files, one box per Snakemake rule, in the
-order data actually flows through them. Regenerate this whenever phase2's
-rule structure changes materially -- update this script's STAGES list to
-match, don't just re-run it against stale assumptions. Last redrawn for
-the three-tool taxonomy + MetaCerberus structure (2026-11-02).
+from html import escape
+from pathlib import Path
 
-TOOL_VERSIONS below are a snapshot queried directly from each rule's
-actual conda env in workflow/phase2/.snakemake/conda/ on 2026-11-02 (e.g.
-`mmseqs version`, `virsorter --version`), not hand-typed from memory or
-from the env yaml pins (which can drift from what's actually installed).
-Re-query and update if envs get rebuilt.
+OUT_SVG = Path(__file__).resolve().with_suffix(".svg")
 
-Usage:
-    python phase2_flow_diagram.py
-Output:
-    phase2_flow_diagram.png (written next to this script)
-"""
-
-import os
-
-import matplotlib.pyplot as plt
-from matplotlib.patches import FancyBboxPatch, FancyArrowPatch
-
-OUT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "phase2_flow_diagram.png")
-
-# Queried 2026-11-02 from each rule's actual .snakemake/conda/<hash>_ env
-# (`<tool> --version`/`version`), not from env yaml pins or memory -- see
-# module docstring. None = no single version string applies (internal
-# python/pandas scripts).
-TOOL_VERSIONS = {
-    "input": "sra-tools 3.1.1",
-    "fastp": "fastp 1.4.0",
-    "assembly": "SPAdes 4.3.0 / bwa-mem3 0.14.0 / Samtools 1.24",
-    "filter": "Samtools 1.24 / Seqkit",
-    "virsorter2": "VirSorter2 2.2.4",
-    "kraken2": "Kraken2 2.17.2 (k2_viral 2026-06-26)",
-    "genomad": "geNomad 1.12.0 (DB v1.9)",
-    "rdrpcatch": "RdRpCATCH 0.0.9",
-    "checkv": "CheckV 1.1.1",
-    "metacerberus": "MetaCerberus 1.4.0",
+COLORS = {
+    "input": ("#e0f2fe", "#0284c7", "#0c4a6e"),      # 01.input.smk
+    "qc": ("#ffedd5", "#ea580c", "#7c2d12"),         # 02.fastp.smk
+    "asm": ("#ede9fe", "#6366f1", "#312e81"),        # 03.assembly.smk
+    "tax": ("#d1fae5", "#059669", "#064e3b"),        # 04.taxonomy.smk
+    "vs2": ("#f3e8ff", "#7c3aed", "#4c1d95"),        # VirSorter2 (annotation only)
+    "merge": ("#ffe4e6", "#e11d48", "#881337"),      # 05.merge_tax.smk
+    "annot": ("#fef3c7", "#d97706", "#78350f"),      # 06.annotation.smk
+    "output": ("#f1f5f9", "#334155", "#0f172a"),     # final outputs
 }
 
-# Each stage: (label, rule file, column, row). Column groups stages that
-# run in parallel at the same point in the pipeline; row orders them
-# top-to-bottom.
-STAGES = {
-    "input":      ("Stage reads\n(SRA fetch or local)",                 "01.input.smk",      0, 0),
-    "fastp":      ("fastp_cleaning",                                    "02.fastp.smk",      0, 1),
-    "assembly":   ("rnaviral_assembly\n(rnaviralSPAdes)",               "03.assembly.smk",   0, 2),
-    "filter":     ("filter_contigs\n(drop zero-coverage)",              "03.assembly.smk",   0, 3),
-    "kraken2":    ("run_kraken2\n(k-mer, known viruses)",               "04.taxonomy.smk",   -1.5, 4.3),
-    "genomad":    ("run_genomad\n(markers + NN, ICTV taxonomy)",        "04.taxonomy.smk",   -0.5, 4.3),
-    "rdrpcatch":  ("run_rdrpcatch\n(RdRp HMMs)",                        "04.taxonomy.smk",   0.5, 4.3),
-    "virsorter2": ("run_virsorter2\n(viral score, annotation only)",    "03.assembly.smk",   1.5, 4.3),
-    "collect":    ("collect_viral_positives\n(union: any tool positive)", "05.merge_tax.smk", -0.5, 5.6),
-    "checkv":     ("run_checkv\n(quality, annotation only)",            "04.taxonomy.smk",   -0.5, 6.6),
-    "annotate":   ("annotate_viral_positives\n(+ CheckV, VirSorter2 columns)", "05.merge_tax.smk", 0, 7.6),
-    "merge":      ("build_master_database\n(all samples)",              "05.merge_tax.smk",  0, 8.6),
-    "select":     ("select_contigs_for_annotation\n(positives >= 1 kb)", "06.annotation.smk", 0, 9.6),
-    "metacerberus": ("run_metacerberus\n(KOFam / VOG / PHROG)",         "06.annotation.smk", 0, 10.6),
-    "final":      ("results/master_viral_database.fasta\nresults/annotation/metacerberus/", None, 0, 11.6),
-}
 
-EDGES = [
-    ("input", "fastp"),
-    ("fastp", "assembly"),
-    ("assembly", "filter"),
-    ("filter", "kraken2"),
-    ("filter", "genomad"),
-    ("filter", "rdrpcatch"),
-    ("filter", "virsorter2"),
-    ("kraken2", "collect"),
-    ("genomad", "collect"),
-    ("rdrpcatch", "collect"),
-    ("collect", "checkv"),
-    ("checkv", "annotate"),
-    ("virsorter2", "annotate"),
-    ("annotate", "merge"),
-    ("merge", "select"),
-    ("select", "metacerberus"),
-    ("metacerberus", "final"),
-]
-
-# Colour by rule file so it's visually obvious which .smk each stage lives
-# in -- not a measured/data palette, just a fixed lookup for this diagram.
-FILE_COLORS = {
-    "01.input.smk": "#8ecae6",
-    "02.fastp.smk": "#fb8500",
-    "03.assembly.smk": "#8338ec",
-    "04.taxonomy.smk": "#06a77d",
-    "05.merge_tax.smk": "#d62828",
-    "06.annotation.smk": "#ffb703",
-    None: "#e9ecef",
-}
-
-BOX_W, BOX_H = 2.6, 1.05
-COL_SPACING = 2.9
-ROW_SPACING = 1.55
+def card(
+    x: int,
+    y: int,
+    w: int,
+    h: int,
+    title: str,
+    subtitle: str,
+    tool: str,
+    style: str,
+    dashed: bool = False,
+) -> str:
+    """Render a crisp rounded card with left accent bar and optional tool badge."""
+    bg, accent, fg = COLORS[style]
+    dash_attr = ' stroke-dasharray="5,3"' if dashed else ""
+    cx = x + w / 2 + 3
+    lines = [
+        f'<g filter="url(#shadow)">',
+        f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="8" fill="{bg}" '
+        f'stroke="{accent}" stroke-width="1.5"{dash_attr}/>',
+        f'<rect x="{x}" y="{y}" width="6" height="{h}" rx="3" fill="{accent}"/>',
+    ]
+    if tool:
+        lines.append(
+            f'<text x="{cx}" y="{y + 21}" text-anchor="middle" font-size="13" font-weight="600" fill="{fg}">{escape(title)}</text>'
+            f'<text x="{cx}" y="{y + 37}" text-anchor="middle" font-size="11" fill="#475569">{escape(subtitle)}</text>'
+            f'<text x="{cx}" y="{y + 53}" text-anchor="middle" font-size="10" font-weight="600" fill="{accent}">{escape(tool)}</text>'
+        )
+    elif subtitle:
+        lines.append(
+            f'<text x="{cx}" y="{y + h / 2 - 4}" text-anchor="middle" font-size="13" font-weight="600" fill="{fg}">{escape(title)}</text>'
+            f'<text x="{cx}" y="{y + h / 2 + 13}" text-anchor="middle" font-size="11" fill="#475569">{escape(subtitle)}</text>'
+        )
+    else:
+        lines.append(
+            f'<text x="{cx}" y="{y + h / 2 + 4}" text-anchor="middle" font-size="13" font-weight="600" fill="{fg}">{escape(title)}</text>'
+        )
+    lines.append("</g>")
+    return "\n".join(lines)
 
 
-def stage_xy(col, row):
-    return col * COL_SPACING, -row * ROW_SPACING
-
-
-def draw():
-    fig, ax = plt.subplots(figsize=(11, 17))
-    ax.set_xlim(-6, 6)
-    ax.set_ylim(-19.5, 2)
-    ax.axis("off")
-    ax.set_title(
-        "Phase 2 data flow (three-tool taxonomy + MetaCerberus, 2026-11-02)\n"
-        "workflow/phase2/Snakefile_phase2 + rules/*.smk",
-        fontsize=13, fontweight="bold", pad=20,
+def arrow(points: list[tuple[float, float]], dashed: bool = False) -> str:
+    """Render a crisp orthogonal connector with arrowhead."""
+    d = f"M {points[0][0]},{points[0][1]}"
+    for px, py in points[1:]:
+        d += f" L {px},{py}"
+    dash_attr = ' stroke-dasharray="4,3"' if dashed else ""
+    return (
+        f'<path d="{d}" fill="none" stroke="#64748b" stroke-width="1.8" '
+        f'stroke-linejoin="round" stroke-linecap="round"{dash_attr} marker-end="url(#ah)"/>'
     )
 
-    centers = {}
-    for key, (label, rule_file, col, row) in STAGES.items():
-        x, y = stage_xy(col, row)
-        centers[key] = (x, y)
-        color = FILE_COLORS.get(rule_file, "#e9ecef")
-        box = FancyBboxPatch(
-            (x - BOX_W / 2, y - BOX_H / 2), BOX_W, BOX_H,
-            boxstyle="round,pad=0.08,rounding_size=0.12",
-            linewidth=1.2, edgecolor="#343a40", facecolor=color, alpha=0.85,
-            zorder=2,
+
+def build_svg() -> str:
+    """Assemble the complete Phase 2 SVG diagram."""
+    w, h = 1040, 670
+    parts: list[str] = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" width="{w}" height="{h}" '
+        f'font-family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif">',
+        "<defs>",
+        '  <marker id="ah" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">',
+        '    <polygon points="0 0, 8 3, 0 6" fill="#64748b"/>',
+        "  </marker>",
+        '  <filter id="shadow" x="-5%" y="-5%" width="110%" height="115%">',
+        '    <feDropShadow dx="0" dy="1.5" stdDeviation="2" flood-color="#0f172a" flood-opacity="0.08"/>',
+        "  </filter>",
+        "</defs>",
+        f'<rect x="0" y="0" width="{w}" height="{h}" rx="12" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5"/>',
+        # Header
+        '<text x="36" y="40" font-size="18" font-weight="700" fill="#0f172a">'
+        "Phase 2 — Viral Assembly, Three-Tool Taxonomy &amp; Functional Annotation</text>",
+        '<text x="36" y="60" font-size="12" fill="#64748b">'
+        "workflow/phase2/Snakefile_phase2 · standalone from CSV manifest (SRA or local FASTQ)</text>",
+        '<line x1="36" y1="74" x2="1004" y2="74" stroke="#e2e8f0" stroke-width="1"/>',
+    ]
+
+    # Row 1: Stage 1 Intake & Assembly (4 cards horizontally)
+    parts.append('<text x="36" y="96" font-size="11" font-weight="700" fill="#64748b">1 · READ INTAKE, QC &amp; ASSEMBLY (PER SAMPLE)</text>')
+    parts.append(card(36, 106, 215, 66, "Stage reads", "SRA fetch or local FASTQ", "sra-tools 3.1.1", "input"))
+    parts.append(card(287, 106, 215, 66, "fastp_cleaning", "adapter & quality trim", "fastp 1.4.0", "qc"))
+    parts.append(card(538, 106, 215, 66, "rnaviral_assembly", "de novo viral assembly", "rnaviralSPAdes · bwa-mem3", "asm"))
+    parts.append(card(789, 106, 215, 66, "filter_contigs", "drop zero-coverage contigs", "samtools · seqkit", "asm"))
+
+    parts.append(arrow([(251, 139), (285, 139)]))
+    parts.append(arrow([(502, 139), (536, 139)]))
+    parts.append(arrow([(753, 139), (787, 139)]))
+
+    # Orthogonal fan-out bus from filter_contigs to Row 2
+    parts.append('<text x="36" y="196" font-size="11" font-weight="700" fill="#64748b">2 · PARALLEL VIRAL SCREENING &amp; SCORING</text>')
+    parts.append(arrow([(896, 172), (896, 206), (143, 206), (143, 224)]))
+    parts.append(arrow([(896, 206), (394, 206), (394, 224)]))
+    parts.append(arrow([(896, 206), (645, 206), (645, 224)]))
+    parts.append(arrow([(896, 206), (896, 224)], dashed=True))
+
+    # Row 2: Parallel Viral Screening (3 screening tools + 1 annotation-only)
+    parts.append(card(36, 226, 215, 66, "run_kraken2", "k-mer known viruses", "Kraken2 2.17.2", "tax"))
+    parts.append(card(287, 226, 215, 66, "run_genomad", "markers + NN, ICTV tax", "geNomad 1.12.0 (DB v1.9)", "tax"))
+    parts.append(card(538, 226, 215, 66, "run_rdrpcatch", "RdRp HMM profiles", "RdRpCATCH 0.0.9", "tax"))
+    parts.append(card(789, 226, 215, 66, "run_virsorter2", "viral score (annotation only)", "VirSorter2 2.2.4", "vs2", dashed=True))
+
+    # Orthogonal merge from 3 screening tools into collect_viral_positives
+    parts.append(arrow([(143, 292), (143, 314), (394, 314), (394, 342)]))
+    parts.append(arrow([(394, 292), (394, 342)]))
+    parts.append(arrow([(645, 292), (645, 314), (394, 314), (394, 342)]))
+
+    # Row 3: Consensus Merge & Quality Annotation
+    parts.append('<text x="36" y="334" font-size="11" font-weight="700" fill="#64748b">3 · CONSENSUS UNION &amp; QUALITY ANNOTATION</text>')
+    parts.append(card(236, 344, 316, 66, "collect_viral_positives", "union: any screening tool positive", "tool_calls.tsv + viral_positives.fasta", "merge"))
+    parts.append(card(36, 344, 172, 66, "run_checkv", "quality (annot. only)", "CheckV 1.1.1", "tax", dashed=True))
+    parts.append(card(586, 344, 260, 66, "annotate_viral_positives", "+ CheckV & VirSorter2 cols", "taxonomy_merged.tsv", "merge"))
+
+    # Clean connectors in Row 3 (separated incoming vs outgoing x-coords)
+    parts.append(arrow([(236, 377), (210, 377)]))
+    parts.append(arrow([(122, 410), (122, 430), (676, 430), (676, 412)], dashed=True))
+    parts.append(arrow([(552, 377), (584, 377)]))
+    parts.append(arrow([(896, 292), (896, 377), (848, 377)], dashed=True))
+
+    # Row 4: Stage 3 Cohort Aggregation & Functional Annotation
+    parts.append('<text x="36" y="454" font-size="11" font-weight="700" fill="#64748b">4 · COHORT AGGREGATION &amp; FUNCTIONAL ANNOTATION (ALL SAMPLES)</text>')
+    parts.append(arrow([(756, 410), (756, 464), (143, 464), (143, 482)]))
+    parts.append(card(36, 484, 215, 66, "build_master_database", "deduplicated cohort DB", "master_metadata.csv", "merge"))
+    parts.append(card(287, 484, 215, 66, "select_contigs", "positives ≥ 1 kb", "filtered FASTA", "annot"))
+    parts.append(card(538, 484, 215, 66, "run_metacerberus", "KOFam / VOG / PHROG", "MetaCerberus 1.4.0", "annot"))
+    parts.append(card(789, 484, 215, 66, "Phase 2 Outputs", "master_viral_database.fasta", "results/annotation/metacerberus/", "output"))
+
+    parts.append(arrow([(251, 517), (285, 517)]))
+    parts.append(arrow([(502, 517), (536, 517)]))
+    parts.append(arrow([(753, 517), (787, 517)]))
+
+    # Bottom Legend
+    legend_items = [
+        ("input", "01.input.smk"),
+        ("qc", "02.fastp.smk"),
+        ("asm", "03.assembly.smk"),
+        ("tax", "04.taxonomy.smk"),
+        ("merge", "05.merge_tax.smk"),
+        ("annot", "06.annotation.smk"),
+        ("vs2", "dashed = annotation only"),
+    ]
+    lx = 36
+    ly = 620
+    for key, label in legend_items:
+        bg, accent, _ = COLORS[key]
+        dash_attr = ' stroke-dasharray="3,2"' if key == "vs2" else ""
+        parts.append(
+            f'<rect x="{lx}" y="{ly - 10}" width="12" height="12" rx="3" fill="{bg}" stroke="{accent}" stroke-width="1.5"{dash_attr}/>'
+            f'<text x="{lx + 18}" y="{ly}" font-size="11" fill="#475569">{escape(label)}</text>'
         )
-        ax.add_patch(box)
-        version = TOOL_VERSIONS.get(key)
-        if version:
-            ax.text(x, y + 0.12, label, ha="center", va="center", fontsize=8.5,
-                     fontweight="medium", color="#212529", zorder=3, wrap=True)
-            ax.text(x, y - BOX_H / 2 + 0.16, version, ha="center", va="center",
-                     fontsize=5.8, style="italic", color="#212529", zorder=3)
-        else:
-            ax.text(x, y, label, ha="center", va="center", fontsize=8.5,
-                     fontweight="medium", color="#212529", zorder=3, wrap=True)
+        lx += 140 if key != "vs2" else 160
 
-    for src, dst in EDGES:
-        x1, y1 = centers[src]
-        x2, y2 = centers[dst]
-        arrow = FancyArrowPatch(
-            (x1, y1 - BOX_H / 2 - 0.02), (x2, y2 + BOX_H / 2 + 0.02),
-            arrowstyle="-|>", mutation_scale=14, linewidth=1.1,
-            color="#495057", zorder=1,
-            connectionstyle="arc3,rad=0.0" if x1 == x2 else "arc3,rad=0.15",
-        )
-        ax.add_patch(arrow)
+    parts.append("</svg>")
+    return "\n".join(parts) + "\n"
 
-    # Legend: which colour = which rule file
-    legend_x, legend_y = 3.3, 1.0
-    ax.text(legend_x, legend_y + 0.3, "rules/", fontsize=9, fontweight="bold")
-    seen = []
-    for rule_file, color in FILE_COLORS.items():
-        if rule_file is None or rule_file in seen:
-            continue
-        seen.append(rule_file)
-        legend_y -= 0.35
-        ax.add_patch(plt.Rectangle((legend_x, legend_y - 0.1), 0.25, 0.2, facecolor=color, edgecolor="#343a40"))
-        ax.text(legend_x + 0.35, legend_y, rule_file, fontsize=7.5, va="center")
 
-    fig.tight_layout()
-    fig.savefig(OUT_PATH, dpi=150, bbox_inches="tight")
-    print(f"Wrote {OUT_PATH}")
+def main() -> int:
+    OUT_SVG.write_text(build_svg(), encoding="utf-8")
+    print(f"Wrote {OUT_SVG}")
+    return 0
 
 
 if __name__ == "__main__":
-    draw()
+    raise SystemExit(main())
