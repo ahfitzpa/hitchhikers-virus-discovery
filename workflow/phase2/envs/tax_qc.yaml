@@ -1,10 +1,10 @@
-name: tax_core
+name: tax_qc
 channels:
   - conda-forge
   - bioconda
   - defaults
 dependencies:
-  # Annotation tools
+  # Annotation and quality-control tools
   - virsorter=2
   - checkv
-  - ruamel
+  - ruamel.yaml

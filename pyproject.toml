@@ -1,0 +1,46 @@
+[project]
+name = "hitchhikers-virus-discovery"
+version = "1.0.0"
+description = "Modular Snakemake workflows for Serratus/Logan SRA virus discovery (Phase 1) and viral assembly, taxonomy, and annotation (Phase 2)"
+readme = "README.md"
+license = { text = "GPL-3.0-or-later" }
+requires-python = ">=3.10"
+authors = [
+    { name = "Amy H. Fitzpatrick" },
+    { name = "Artem Babaian" },
+    { name = "Nicola F. Fletcher" },
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+    "mypy>=1.10",
+    "pandas>=2.0",
+    "biopython>=1.83",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v"
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W"]
+ignore = ["E501", "E402"]
+
+[tool.ruff.lint.per-file-ignores]
+# Snakemake injects the `snakemake` global into scripts invoked via `script:`.
+"workflow/phase1/scripts/01.centroid_query.py" = ["F821"]
+"workflow/phase1/scripts/04.metadata_merge.py" = ["F821"]
+"workflow/phase1/scripts/align_matrix.py" = ["F821"]
+"workflow/phase1/scripts/extract_sra_ids.py" = ["F821"]
+"workflow/phase2/scripts/build_master_database.py" = ["F821"]
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+check_untyped_defs = false
