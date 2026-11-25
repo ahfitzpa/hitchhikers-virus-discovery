@@ -14,5 +14,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Run unit, syntax, and repository hygiene tests
-        run: python3 -m unittest discover -s tests -v
+      - name: Install test and lint dependencies
+        run: python -m pip install --upgrade pip pytest ruff pandas biopython
+      - name: Lint with Ruff
+        run: ruff check tests workflow/phase1/scripts workflow/phase2/scripts
+      - name: Check Bash script syntax
+        run: |
+          for s in $(find workflow -name '*.sh' | sort); do
+            bash -n "$s"
+          done
+      - name: Run full unit and integration test suite
+        run: pytest -v
