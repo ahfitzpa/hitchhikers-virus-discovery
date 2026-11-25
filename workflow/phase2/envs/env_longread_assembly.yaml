@@ -1,0 +1,13 @@
+# envs/env_longread_assembly.yaml
+name: longread_assembly
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - flye
+  - minimap2
+  - samtools
+  - viralflye
+  - hmmer
+  - racon

@@ -1,0 +1,32 @@
+paths:
+  references: references
+  convert_fasta_script: scripts/convert_csv_to_fasta.py
+  DB: databases
+  
+database:
+  host: serratus-aurora-20210406.cluster-ro-ccz9y6yshbls.us-east-1.rds.amazonaws.com
+  name: summary
+  user: public_reader
+  password: serratus
+
+tools:
+  DISCOVERY_ENV: envs/env_phase1_discovery.yaml
+  ASSEMBLY_ENV: envs/env_phase2_assembly.yaml
+  snikt_ENV: envs/snikt.yml
+  ICCTAX_ENV: envs/icctax.yml
+  TAX_CORE_ENV: envs/tax_core.yaml
+  TAX_QC_ENV: envs/tax_qc.yaml
+  META_ENV: envs/metacerberus.yaml
+  
+# No MMseqs2 database is downloaded for either phase: phase1 runs mmseqs only
+# against query/reference DBs it builds from its own sOTU centroids, and
+# phase2 replaced its MMseqs2/nt taxonomy with Kraken2 + geNomad + RdRpCATCH.
+databases:
+  rdrp_catch_hmm: "$PWD/databases/rdrpcatch_db"
+  virsorter2_db: "$PWD/databases/virsorter2_db"
+  checkv_db: "$PWD/databases/checkv_db"
+
+metadata:
+  shortlist: "data/03.merged_metadata/novel/shortlist_summary.csv"
+  manifest: "data/03.merged_metadata/novel/download_manifest.txt"
+  hosts: "data/03.merged_metadata/novel/hosts.txt" # Add this line

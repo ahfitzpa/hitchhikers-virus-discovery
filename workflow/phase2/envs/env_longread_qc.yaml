@@ -1,0 +1,9 @@
+# envs/env_longread_qc.yaml
+name: longread_qc
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - chopper
+  - fastplong

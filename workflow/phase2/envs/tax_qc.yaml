@@ -1,0 +1,10 @@
+name: tax_core
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  # Annotation tools
+  - virsorter=2
+  - checkv
+  - ruamel

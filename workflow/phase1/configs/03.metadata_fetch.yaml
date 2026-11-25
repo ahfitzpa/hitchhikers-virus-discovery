@@ -1,0 +1,4 @@
+# Configuration settings for NCBI Entrez Utilities
+efetch:
+  db: "sra"
+  format: "runinfo"

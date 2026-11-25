@@ -1,0 +1,43 @@
+# Outputs later analysis depends on. Enforced by scripts/retention_guard.py:
+#   * at every snakemake parse (dry runs included), the workflow refuses to
+#     start if a rule declares one of these temp(), or a rule's shell deletes
+#     one it does not itself produce;
+#   * after every run, a ledger (data/.retention_ledger.tsv) records each one
+#     that exists and reports any recorded file that has since disappeared;
+#   * scripts/cleanup_intermediates.sh refuses to delete any of them.
+#
+# Why this exists (2026-11-20): reads, fastp output, contigs.fasta and
+# sorted.bam were reclaimed for every finished sample before per-contig
+# coverage had been taken, and run_rdrpcatch/taxonomy_cleanup purged the
+# six-frame translation the RdRp domain extraction needs. Recovering cost a
+# full re-download of 96 runs. Reads and BAMs are deliberately NOT listed
+# (terabytes): a rule that needs them must be a declared consumer of the
+# temp() file so it runs before the file is reclaimed.
+#
+# Adding a downstream step that reads a per-sample file? Add the file here.
+# Removing a line needs a reason in the commit message.
+#
+# pattern	needed_by
+data/02.fastp/{family}/{sample}/{sample}_report.json	stage_counts (raw/post-QC read counts)
+data/03.rnaviralSPAdes/{family}/{sample}/filtered_contigs.fasta	taxonomy tools, master database, remap_for_coverage, rdrp_domains translation rebuild
+data/03.rnaviralSPAdes/{family}/{sample}/coverage_stats.tsv	stage_counts, escalation_fractions, candidate_contig_table, combined_benchmarks, analysis_novel genome maps
+data/03.rnaviralSPAdes/{family}/{sample}/idxstats.tsv	stage_counts (assembled contig count)
+data/03.rnaviralSPAdes/{family}/{sample}/virsorter2/final-viral-score.tsv	annotate_viral_positives (vs2 score column)
+data/03.assembly_stats/{family}/{sample}/{sample}_stats.txt	assembly QC summaries
+data/04.taxonomy/{family}/{sample}/kraken2/kraken2_output.tsv	collect_viral_positives, stage_counts
+data/04.taxonomy/{family}/{sample}/kraken2/kraken2_report.txt	taxonomy QC
+data/04.taxonomy/{family}/{sample}/genomad/filtered_contigs_summary/filtered_contigs_virus_summary.tsv	collect_viral_positives
+data/04.taxonomy/{family}/{sample}/rdrpcatch/rdrp_annotated.tsv	collect_viral_positives, rdrp_domains
+data/04.taxonomy/{family}/{sample}/checkv/quality_summary.tsv	annotate_viral_positives
+data/05.final_selection/{family}/{sample}/tool_calls.tsv	merge_taxonomy_calls, candidate table
+data/05.final_selection/{family}/{sample}/viral_positives.fasta	build_master_database
+data/05.final_selection/{family}/{sample}/taxonomy_merged.tsv	build_master_database, reporting, novelty tiers
+data/06.rdrp/{family}/{sample}/{sample}_rdrp_domains.faa	ictv_prepare -> analysis_novel phylogenetics
+data/06.rdrp/{family}/{sample}/{sample}_rdrp_domains.tsv	ictv_prepare, combined_benchmarks
+results/master_viral_database.fasta	MetaCerberus, ICTV bundles, analysis_novel genome maps
+results/taxonomy/master_metadata.csv	reporting
+results/annotation/metacerberus	export_metacerberus_orfs, analysis_novel demarcation
+results/reporting/candidate_contigs.tsv	analysis_novel
+results/reporting/metacerberus_orfs.faa	analysis_novel
+results/reporting/benchmarks_combined.tsv	reporting
+results/ictv/families.tsv	analysis_novel

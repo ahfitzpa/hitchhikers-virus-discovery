@@ -1,0 +1,8 @@
+# envs/metacerberus.yaml
+name: metacerberus
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+ - metacerberus

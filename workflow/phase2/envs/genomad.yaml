@@ -1,0 +1,8 @@
+name: genomad
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  # Pinned to the version the method comparison / CAMI2 benchmark ran
+  # (DB v1.9 at /path/to/databases/genomad_db).
+  - genomad=1.12.0

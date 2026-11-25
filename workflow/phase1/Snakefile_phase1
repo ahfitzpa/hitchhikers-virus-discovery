@@ -1,0 +1,58 @@
+import sys
+import os
+import yaml
+
+# =========================================================================
+# 1. LOAD CONFIG FIRST
+# =========================================================================
+def deep_update(d, u):
+    for k, v in u.items():
+        if isinstance(v, dict) and isinstance(d.get(k), dict):
+            deep_update(d[k], v)
+        else:
+            d[k] = v
+    return d
+
+config = {}
+for f in ["configs/paths.yaml", "configs/phase1_sra_discovery.yaml"]:
+    with open(f) as fh:
+        deep_update(config, yaml.safe_load(fh))
+
+mode = config.get("current_mode", "novel")
+discovery_type = config["scenarios"][mode].get("discovery_type", "known")
+print(f"DEBUG: Mode is {mode}, discovery_type is {discovery_type}")
+
+# =========================================================================
+# 2. DYNAMIC TARGET DEFINITION
+# =========================================================================
+def get_final_targets(wildcards):
+    targets = [
+        f"data/02.SRA_metadata/{mode}/unified_metadata.tsv.gz",
+        f"data/03.merged_metadata/{mode}/merged_metadata.csv"
+    ]
+    
+    if discovery_type == "novel":
+        targets.append(f"data/01.sOTUs_centroid/{mode}/sra_ids.txt")
+    else:
+        targets.append(f"data/01.sOTUs_centroid/{mode}/unique.csv")
+        targets.append(f"data/03.merged_metadata/{mode}/approved.flag")
+    return targets
+
+rule run_phase1:
+    input: get_final_targets
+
+# =========================================================================
+# 3. CONDITIONAL MODULE INCLUSION
+# =========================================================================
+# Always include base query logic
+include: "rules/01.base_discovery.smk"
+
+# Metadata modules are always needed
+include: "rules/03.metadata_fetch.smk"
+include: "rules/04.metadata_merge.smk"
+
+# Load the pathway-specific rules based on the scenario
+if discovery_type == "novel":
+    include: "rules/01.centroid_unanchored.smk"
+else:
+    include: "rules/01.centroid_anchored.smk"

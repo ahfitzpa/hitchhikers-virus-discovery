@@ -1,0 +1,23 @@
+cff-version: 1.2.0
+message: "If you use this workflow, please cite it using the metadata below."
+title: "A Hitchhiker's Guide to Virus Discovery: Modular Snakemake Workflows for SRA Screening, Viral Assembly, and Annotation"
+type: software
+authors:
+  - family-names: Fitzpatrick
+    given-names: Amy H.
+    affiliation: "School of Veterinary Medicine, University College Dublin, Ireland"
+  - family-names: Babaian
+    given-names: Artem
+    affiliation: "Department of Molecular Genetics, University of Toronto, Canada"
+  - family-names: Fletcher
+    given-names: Nicola F.
+    affiliation: "School of Veterinary Medicine, University College Dublin, Ireland"
+repository-code: "https://github.com/ahfitzpa/hitchhikers-virus-discovery"
+license: GPL-3.0
+keywords:
+  - virus discovery
+  - RNA viruses
+  - Snakemake
+  - Serratus
+  - Logan
+  - metatranscriptomics

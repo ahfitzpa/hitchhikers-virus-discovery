@@ -1,0 +1,23 @@
+name: virus_phase1_discovery
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+channel_priority: strict
+
+dependencies:
+  - python=3.11
+  - numpy
+  - pyyaml
+  - pandas
+  - requests
+  - entrez-direct
+  - mmseqs2
+  - seqkit
+  - awscli
+  - sra-tools>=3.0.0
+  - setuptools
+  - wheel
+  - pip
+  - psycopg
+  - psycopg-c

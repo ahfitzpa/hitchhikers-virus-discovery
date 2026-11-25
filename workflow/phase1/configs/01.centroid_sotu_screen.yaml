@@ -1,0 +1,3 @@
+# Specific performance parameters for Step 01 centroid screening
+analysis:
+  usearch_threads: 16

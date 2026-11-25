@@ -1,0 +1,187 @@
+# Master Analysis Scenarios File
+current_mode: "geographic_wastewater" # Options: "novel", "surrogate",
+# "host_expansion", "geographic", "geographic_wastewater"
+
+# Redundancy-collapse thresholds used when building queryDB from raw Logan
+# unitigs (mmseqs_build_querydb). This is deliberately separate from each
+# scenario's mmseqs_params below: those tune search stringency per biological
+# question, this just collapses near-duplicate unitigs into centroids so
+# createdb/linclust don't choke on billions of redundant records.
+querydb_clustering:
+  min_seq_id: 0.97
+  coverage: 0.9
+  cov_mode: 1
+
+# Global defaults to prevent duplication
+default_mmseqs_params:
+  sensitivity: 7.5
+  search_type: 3
+  coverage_mode: 0
+  min_seq_id: 0.3
+  coverage_threshold: 0.15
+
+scenarios:
+  novel:
+    family: "Hepeviridae"
+    discovery_type: "novel"
+    mmseqs_params:
+      min_seq_id: 0.45
+      max_seq_id: 0.60
+      coverage_threshold: 0.05
+    filtering:
+      min_sra_read_coverage: 200
+      min_bioprojects_per_sotu: 2
+      min_unique_hosts: 1
+    test_limit: 200
+
+  surrogate:
+    family: "Hepeviridae"
+    discovery_type: "known"
+    mmseqs_params:
+      # Lowered slightly to capture robust cross-species viral conservation
+      min_seq_id: 0.70   
+      max_seq_id: 0.85
+      # Keeps alignment target relaxed for conserved sequence domain fragments
+      coverage_threshold: 0.15 
+    filtering:
+      # Keeps sequencing depth verification proxy high
+      min_sra_read_coverage: 150 
+      # REDUCED TO 1 FOR LOCAL TEST SET VALIDATION (Change back to 2 for production scales)
+      min_bioprojects_per_sotu: 1 
+      min_unique_hosts: 1
+    anchor:
+      required: true
+      taxid: 12461 # Orthohepevirus A reference tracking anchor
+    test_limit: 300
+
+  host_expansion:
+    family: "Hepeviridae"
+    discovery_type: "known"
+    mmseqs_params:
+      # Lowering min_seq_id slightly allows for detection of divergent strains
+      min_seq_id: 0.70  
+      max_seq_id: 1.00
+      # Increasing coverage threshold helps filter out "noisy" partial matches
+      coverage_threshold: 0.20 
+    filtering:
+      min_sra_read_coverage: 1000
+      min_bioprojects_per_sotu: 1
+      min_unique_hosts: 1
+    anchor:
+      required: true
+      taxid: 1678145 # This is the taxid for Rocahepevirus ratti
+    test_limit: 300
+
+  # Wastewater flavivirus surveillance, Europe + North Africa (2026-11-24).
+  # Narrower than `geographic` in sample type and geography, wider in depth.
+  geographic_wastewater:
+    family: "Flaviviridae"
+    discovery_type: "known"
+    mmseqs_params:
+      min_seq_id: 0.95
+      max_seq_id: 1.00
+      coverage_threshold: 0.20
+    filtering:
+      # 1. Any coverage, deliberately. The European flavivirus signal sits at
+      #    median 2-4x (results/feasibility/scope_europe_flavi.tsv) and the
+      #    five European Usutu runs at median 35x, so any floor above 1 throws
+      #    away the surveillance material this scenario exists to find. The
+      #    50-run pilot is the evidence that low coverage still assembles:
+      #    15/15 runs below 50x assembled and 12/15 carried a flavivirus.
+      min_sra_read_coverage: 1
+      min_bioprojects_per_sotu: 1
+      min_unique_hosts: 1
+      # 2. Identity, not depth, is what separates a detection from noise here,
+      #    so this gate stays where `geographic` put it.
+      min_run_percent_identity: 80
+      require_geo: true
+      exclude_cell_culture: true
+      exclude_bioprojects:
+        # Zika serial passage in Huh7.5.1 cells (CNRS); "France:Lyon" is the
+        # lab's address, not a sampling site.
+        - PRJNA686429
+      # 3. Europe as analysis_geography/scripts/wastewater_flavi_scope.py
+      #    defines it (Turkey already included there), plus the North African
+      #    coast. Substring match, so "Czech" covers both spellings and
+      #    "United Kingdom" is complemented by the home nations.
+      geo_include: ["Albania", "Andorra", "Austria", "Belarus", "Belgium",
+        "Bosnia", "Bulgaria", "Croatia", "Cyprus", "Czech", "Denmark",
+        "Estonia", "Finland", "France", "Germany", "Gibraltar", "Greece",
+        "Hungary", "Iceland", "Ireland", "Italy", "Kosovo", "Latvia",
+        "Liechtenstein", "Lithuania", "Luxembourg", "Malta", "Moldova",
+        "Monaco", "Montenegro", "Netherlands", "Macedonia", "Norway", "Poland",
+        "Portugal", "Romania", "Russia", "San Marino", "Serbia", "Slovakia",
+        "Slovenia", "Spain", "Sweden", "Switzerland", "Turkey", "Ukraine",
+        "United Kingdom", "England", "Scotland", "Wales",
+        "Morocco", "Algeria"]
+      # 4. Wastewater terms, same patterns as wastewater_flavi_scope.py.
+      #    library_source is METAGENOMIC for most sewage runs, so the match is
+      #    on the free-text names and the normalised tissue call instead.
+      sample_type_include: ['waste\s*water', "wastewater", "sewage", "sewer",
+        "influent", "effluent", "wwtp", "activated sludge"]
+    anchor:
+      required: true
+      taxid: 11082 # West Nile virus; sOTU u4485 (+ u8890)
+    # 5. Generous: the pool is unmeasured at coverage >= 1, and a binding cap
+    #    ordered by coverage desc would again select against the low-titre
+    #    European runs. Measure the pool before trusting this number.
+    max_runs: 3000
+
+  geographic:
+    family: "Flaviviridae"
+    discovery_type: "known"
+    mmseqs_params:
+      min_seq_id: 0.95
+      max_seq_id: 1.00
+      coverage_threshold: 0.20
+    filtering:
+      # 1. Was 1000. The WNV sOTU pool holds 1844 runs; at cov>=1000 only 335
+      #    survive and every European run is gone. 50 keeps low-titre
+      #    environmental samples, where surveillance signal actually lives.
+      min_sra_read_coverage: 50
+      min_bioprojects_per_sotu: 1
+      min_unique_hosts: 1
+      # 2. NEW. Gates palm_sra2.percent_identity, the run's own contig-vs-
+      #    palmprint identity. Without it PRJNA686429 (Zika serial passage in
+      #    Huh7.5.1 cells, CNRS) entered the old shortlist on 52-68% hits to
+      #    the WNV sOTU u4485, and two water metagenomes entered at 35%
+      #    identity / 1x coverage: cross-assignment and noise, not detections.
+      min_run_percent_identity: 80
+      # 3. NEW. Phylogeography needs a sampling location. 73% of Flaviviridae
+      #    runs carry geo_loc_name in the Serratus biosample table, so
+      #    requiring it is affordable.
+      require_geo: true
+      # 4. NEW. Lab-passage samples carry the LAB's address as geo_loc_name, so
+      #    they are actively misleading here: PRJNA686429's 19 runs are all
+      #    "France:Lyon" because CNRS is in Lyon. Implemented against
+      #    biosample_tissue.tissue (Serratus's normalised tissue call), not
+      #    free text: srarun shows only scientific_name="Zika virus" and
+      #    library_name="DD9_D" for those runs, so a name regex cannot see it.
+      exclude_cell_culture: true
+      # 5. NEW. Auditable backstop for lab-derived projects with no
+      #    machine-readable marker. Every entry carries its reason.
+      exclude_bioprojects:
+        # Zika serial passage in Huh7.5.1 cells (CNRS). 100% identity to the
+        # Zika sOTU u741 at up to 12,394x coverage, so it passes every quality
+        # gate legitimately -- but "France:Lyon" is the lab's address, not a
+        # sampling site. Listed as belt-and-braces alongside the
+        # biosample_tissue rule, which also catches it.
+        - PRJNA686429
+    anchor:
+      required: true
+      taxid: 11082 # West Nile virus; sOTU u4485 (+ u8890)
+    # 6. test_limit removed. It was applied as rows[:N] to an UNORDERED result,
+    #    so the previous 329-run manifest was an arbitrary slice of a 1371-run
+    #    pool rather than a sample. max_runs replaces it, applied with a
+    #    deterministic ORDER BY (coverage desc, run_id) so re-runs reproduce.
+    #
+    #    Raised 1200 -> 1500 because the filtered pool is 1419 runs and a 1200
+    #    cap was BINDING: ordering by coverage descending meant the 219
+    #    discarded runs were the lowest-coverage ones, which is exactly where
+    #    the European material sits (the novel Pestivirus seam has median
+    #    coverage 4x, versus 447x median in the capped shortlist). The cap was
+    #    silently selecting for high-titre USA arbovirus projects. At 1500 it
+    #    no longer binds, so it stays only as a safety valve if the filters are
+    #    later loosened. Keeping 219 extra runs costs little in phase2.
+    max_runs: 1500
+    

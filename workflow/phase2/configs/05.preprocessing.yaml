@@ -1,0 +1,11 @@
+# Toggle host scrubbing globally
+options:
+  perform_host_scrubbing: true
+
+# Base fallbacks used by fastp if a project is not explicitly overwritten
+fastp_defaults:
+  qualified_quality_phred: 20
+  overlap_diff_percent_limit: 2
+  min_len: 50
+  max_len: 150
+  overlap_len: 30

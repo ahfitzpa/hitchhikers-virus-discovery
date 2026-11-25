@@ -1,0 +1,18 @@
+# configs/phase2_assembly_analysis.yaml options.perform_host_scrubbing removed
+# along with host scrubbing itself.
+
+fastp_defaults:
+  qualified_quality_phred: 20
+  overlap_diff_percent_limit: 2
+  min_len: 50
+  max_len: 150
+  overlap_len: 30
+
+scenarios:
+  host_expansion:
+    family: "Hepeviridae" # Ensure this is added
+    shortlist_criteria:
+      min_alignment_coverage: 0.10
+      min_sra_read_coverage: 150
+      min_bioprojects_per_sotu: 2
+      min_unique_hosts: 1

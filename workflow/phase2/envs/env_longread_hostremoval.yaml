@@ -1,0 +1,10 @@
+# envs/env_longread_hostremoval.yaml
+name: longread_hostremoval
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - hostile=1.1.0
+  - minimap2
+  - defopt<7

@@ -1,0 +1,10 @@
+# Kept separate from env_longread_assembly.yaml: medaka's pytorch
+# dependency stack combined with viralFlye/hmmer in one solve was
+# unworkably slow (>10min, never finished).
+name: medaka
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - medaka

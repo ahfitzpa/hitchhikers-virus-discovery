@@ -1,0 +1,207 @@
+import os
+import sys
+import yaml
+
+# =========================================================================
+# 1. CONFIG & PATHS
+# =========================================================================
+def deep_update(d, u):
+    for k, v in u.items():
+        if isinstance(v, dict) and isinstance(d.get(k), dict):
+            deep_update(d[k], v)
+        else:
+            d[k] = v
+    return d
+
+config = {}
+for f in ["configs/paths.yaml", "configs/phase2_assembly_analysis.yaml"]:
+    with open(f) as fh:
+        deep_update(config, yaml.safe_load(fh))
+
+# Opt-in overrides for the speed-up validation work.
+if os.environ.get("PHASE2_MANIFEST_OVERRIDE"):
+    config["manifest"] = os.environ["PHASE2_MANIFEST_OVERRIDE"]
+
+# Scratch-backed tmp, not node-local /tmp (small/shared, fills up fast). Set
+# before anything else runs so every shell subprocess and snakemake's own
+# tempfile use picks it up.
+TMPDIR = os.path.join(os.getcwd(), config["paths"]["tmp"])
+os.makedirs(TMPDIR, exist_ok=True)
+os.environ["TMPDIR"] = TMPDIR
+
+# accession must never span a path separator, otherwise Snakemake can't
+# disambiguate references/hosts/{accession} from nested outputs like
+# references/hosts/{accession}/mask.1.bt2
+wildcard_constraints:
+    accession = r"[^/]+"
+
+# Helper to get environment paths
+def get_env(tool_key):
+    return workflow.source_path(f"envs/{config['tools'][tool_key]}")
+
+# =========================================================================
+# 2. INCLUDES
+# =========================================================================
+# rules/01.input.smk loads the manifest (MANIFEST/SAMPLES/FAMILIES) and
+# provides get_reads()/get_reads_named() -- must come before anything
+# below that reads those globals or calls those helpers.
+include: "rules/00.setup.smk"
+include: "rules/01.input.smk"
+
+# =========================================================================
+# 3. MANIFEST-DERIVED HELPERS (stage wiring)
+# =========================================================================
+# Host scrubbing was removed from phase2 entirely.
+def get_fastp_input(wildcards):
+    # Always both paths: a sample not yet downloaded would otherwise be
+    # misread as single-end.
+    fam = SAMPLES[wildcards.sample]['family']
+    sample = wildcards.sample
+    return {
+        "fq1": f"data/01.reads/{fam}/{sample}/{sample}_1.fastq.gz",
+        "fq2": f"data/01.reads/{fam}/{sample}/{sample}_2.fastq.gz",
+    }
+
+# =========================================================================
+# 4. REMAINING INCLUDES
+# =========================================================================
+include: "rules/02.fastp.smk"
+include: "rules/03.assembly.smk"
+include: "rules/04.taxonomy.smk"
+include: "rules/05.merge_tax.smk"
+include: "rules/06.annotation.smk"
+# Reporting and ICTV bundles, ported from conifer_pest_virome (MERGE_PLAN.md).
+# phase3 (../phase3) reads their outputs as finished input.
+include: "rules/07.reporting.smk"
+include: "rules/08.ictv.smk"
+# After 05: reuses _allow_partial_master() from rules/05.merge_tax.smk.
+# Was 07.novelty.smk; renumbered so 07/08 match conifer (phase3 has 09-12).
+include: "rules/09.novelty.smk"
+
+# collect/annotate are deliberately NOT localrules: --jobs is a global
+# ceiling across executors, so no local job can start while SLURM jobs are
+# queued behind the account CPU cap.
+localrules:
+    stage_sra_paired, stage_sra_single, stage_local_paired, stage_local_single,
+    complete_family_reads, complete_family_downloads
+
+# =========================================================================
+# 5. TARGET CONTROL
+# =========================================================================
+# One family's samples at a time -- a straight expand(family=FAMILIES,
+# sample=SAMPLES.keys()) would be a full cross product and request
+# targets for samples that don't belong to that family.
+FINAL_TARGETS = [
+    target
+    for fam in FAMILIES
+    for target in expand(
+        "data/05.final_selection/{family}/{sample}/taxonomy_merged.tsv",
+        family=[fam], sample=family_samples(fam),
+    )
+]
+
+# taxonomy_cleanup is unreachable from rule all without these targets.
+PURGE_TARGETS = [
+    target
+    for fam in FAMILIES
+    for target in expand(
+        "data/04.taxonomy/{family}/{sample}/.purged",
+        family=[fam], sample=family_samples(fam),
+    )
+]
+
+# seqkit_stats is unreachable from rule all without these targets.
+STATS_TARGETS = [
+    target
+    for fam in FAMILIES
+    for target in expand(
+        "data/03.assembly_stats/{family}/{sample}/{sample}_stats.txt",
+        family=[fam], sample=family_samples(fam),
+    )
+]
+
+# Explicit targets: nothing else requests them now that annotate takes the
+# score as params.
+def _virsorter2_skipped():
+    """Samples excluded from VIRSORTER_TARGETS, from configs/virsorter2_skip_samples.txt.
+
+    VirSorter2 is an annotation, not a gate: annotate_viral_positives takes the
+    score as a params path and the merge writes NA when it is missing, so a
+    skipped sample still produces taxonomy_merged.tsv. Measured across the 191
+    completed Hepeviridae samples, VirSorter2 is the sole evidence for zero
+    contigs -- collect_viral_positives builds the candidate set from
+    Kraken2/geNomad/RdRpCATCH and VirSorter2 is joined on afterwards -- so
+    skipping a sample cannot lose a viral call.
+    """
+    p = "configs/virsorter2_skip_samples.txt"
+    out = set()
+    if not os.path.exists(p):
+        return out
+    with open(p) as fh:
+        for line in fh:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            sid = line.split("\t")[0].strip()
+            if sid and sid != "sample_id":
+                out.add(sid)
+    return out
+
+
+VIRSORTER2_SKIP = _virsorter2_skipped()
+if VIRSORTER2_SKIP:
+    print(f"[phase2] VirSorter2 skipped for {len(VIRSORTER2_SKIP)} sample(s): "
+          f"{', '.join(sorted(VIRSORTER2_SKIP))}", file=sys.stderr)
+
+# Explicit targets: nothing else requests them now that annotate takes the
+# score as params. Samples in the skip list are left out -- each exhausted all
+# three attempts at runtime=900 because its assembly carries 1.7-4.7M contigs
+# against a 147k median, which VirSorter2 cannot process in the wall clock.
+VIRSORTER_TARGETS = [
+    target
+    for fam in FAMILIES
+    for target in expand(
+        "data/03.rnaviralSPAdes/{family}/{sample}/virsorter2/final-viral-score.tsv",
+        family=[fam],
+        sample=[s for s in family_samples(fam) if s not in VIRSORTER2_SKIP],
+    )
+]
+
+# rules/09.novelty.smk: one tiered candidate table per family, not per sample --
+# the rule aggregates every sample's merge for that family.
+NOVELTY_TARGETS = expand(
+    "results/reporting/novel_candidates_{family}.tsv", family=FAMILIES
+)
+
+rule all:
+    input:
+        os.path.join(config["databases"]["virsorter2_db"], ".done"),
+        os.path.join(config["databases"]["checkv_db"], ".done"),
+        os.path.join(config["databases"]["rdrp_catch_hmm"], ".done"),
+        FINAL_TARGETS,
+        PURGE_TARGETS,
+        STATS_TARGETS,
+        VIRSORTER_TARGETS,
+        # run_metacerberus's own input chain (metacerberus_input.fasta <-
+        # results/master_viral_database.fasta <- build_master_database <- every
+        # sample's taxonomy_merged.tsv) already enforces "after all samples'
+        # taxonomy finishes".
+        "results/annotation/metacerberus",
+        "results/master_viral_database.fasta",
+        # rules/09.novelty.smk: advisory tiering of the viral positives into
+        # novel-candidate classes. Reporting only -- nothing consumes it, and
+        # it gates nothing. One table per family.
+        NOVELTY_TARGETS,
+        # rules/07.reporting.smk. benchmarks_combined pulls in every
+        # per-library coverage table, RdRp FASTA, stage counts, escalation
+        # fractions and the candidate table; the ORF export follows
+        # MetaCerberus. phase3 reads candidate_contigs.tsv and the ORF export.
+        "results/reporting/candidate_contigs.tsv",
+        "results/reporting/benchmarks_combined.tsv",
+        "results/reporting/metacerberus_orfs.faa",
+        # rules/08.ictv.smk: bundles only; phase3 reads families.tsv.
+        # ictv_family_comparison is a scaffold that fails on purpose and stays
+        # out of rule all.
+        "results/ictv/families.tsv"
+# Must stay the LAST include: checks every rule defined above (see the file).
+include: "rules/99.retention.smk"

@@ -1,0 +1,15 @@
+name: tax_core
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  # Core Taxonomy & Discovery
+  - rdrpcatch
+  - kraken2
+
+  # Utilities
+  - seqkit=2.10
+  - pandas
+  - biopython
+  - pyaml

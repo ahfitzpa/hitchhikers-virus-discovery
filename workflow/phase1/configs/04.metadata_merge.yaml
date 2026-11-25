@@ -1,0 +1,9 @@
+# Configurations for downstream Step 03 metadata merging and filtering
+shortlist_criteria:
+  min_alignment_coverage: 0.10
+  min_sra_read_coverage: 150
+  min_bioprojects_per_sotu: 2  
+  min_unique_hosts: 1
+
+sra_download:
+  output_base_dir: "data/04.SRA_files"

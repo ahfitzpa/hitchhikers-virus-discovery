@@ -1,0 +1,46 @@
+# Snakemake, caches, and Python bytecode
+.snakemake/
+.cache/
+**/__pycache__/
+*.pyc
+
+# External data, databases, results, logs, and temp files
+data/
+databases/
+references/
+results/
+logs/
+benchmarks/
+tmp/
+tools/
+*.log
+*.out
+*.tmp
+*.bak
+*.bak_*
+
+# Containers, archives, and compiled documents
+*.sif
+*.pdf
+*.docx
+*.pptx
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.gz
+*.fastq
+*.fq
+*.bam
+*.sam
+*.cram
+
+# Secrets and OS/editor clutter
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+.DS_Store
+.vscode/
+.idea/
+todo.md

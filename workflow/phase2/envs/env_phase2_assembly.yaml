@@ -1,0 +1,14 @@
+# envs/tax_discovery.yml
+name: tax_discovery
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - awscli
+  - sra-tools=3.1.1
+  - fastp
+  - python=3.10
+  - seqkit
+  - rsync
+  - samtools

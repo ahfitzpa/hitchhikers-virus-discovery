@@ -1,0 +1,15 @@
+# envs/env_rnaviral_assembly.yaml Split out of env_phase2_assembly.yaml
+# bwa-mem3 (needs libzlib>=1.3.2) and hostile=1.1.0's pinned
+# bowtie2==2.4.5 (needs zlib<1.3) can't solve in the same env, and bwa-
+# mem3/spades are only ever used by rnaviral_assembly, not any other
+# ASSEMBLY_ENV rule, so there's no reason to force them to coexist.
+name: rnaviral_assembly
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - python=3.10
+  - spades
+  - bwa-mem3
+  - samtools
