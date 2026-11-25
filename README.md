@@ -85,17 +85,62 @@ sbatch submit_phase2.sh
 
 ---
 
+## Output Files & Schemas
+
+| File | Produced by | Description |
+| :--- | :--- | :--- |
+| `data/03.merged_metadata/<mode>/shortlist_summary.csv` | Phase 1 | Filtered candidate SRA runs joined with NCBI BioSample/SRA metadata |
+| `results/<sample>/taxonomy_merged.tsv` | Phase 2 | Per-contig union of `Kraken2`, `geNomad`, and `RdRpCATCH` calls with `consensus_family`, `family_agreement`, `CheckV`, and `VirSorter2` columns |
+| `results/master_viral_database.fasta` | Phase 2 (Stage 3) | Deduplicated viral positive contigs across all completed manifest samples |
+| `results/reporting/stage_counts.tsv` | Phase 2 | Per-sample attrition from raw reads through assembly, coverage filter, and viral calls |
+| `results/run_manifest.json` | `write_run_manifest.py` | Machine-readable run provenance (workflow version, git commit SHA, command, UTC timestamp, input SHA-256 checksums) |
+
+## Run Provenance
+
+Record a machine-readable provenance manifest alongside any run:
+
+```bash
+python3 workflow/phase2/scripts/write_run_manifest.py \
+  --workflow phase2 \
+  --input workflow/phase2/configs/paths.yaml \
+  --input path/to/manifest.csv \
+  --output-dir results \
+  --out results/run_manifest.json
+```
+
+## Exit Codes
+
+| Exit Code | Meaning |
+| :---: | :--- |
+| `0` | Success |
+| `1` | Runtime error, missing required input file, or retention-guard audit failure |
+| `2` | CLI argument or parameter validation error (e.g., `--min-seq-id > --max-seq-id`) |
+
+## Resource Requirements
+
+- **Disk:** ~35–50 GB one-time storage for the six Phase 2 reference databases (see [workflow/phase2/SETUP.md](workflow/phase2/SETUP.md)), plus scratch space for intermediate assemblies.
+- **Compute:** Phase 1 runs on 2–4 CPUs (API/database I/O bound); Phase 2 per-sample `rnaviralSPAdes` assemblies typically need 8–16 CPUs and 32–64 GB RAM (route exceptionally deep metagenomes via `workflow/phase2/configs/highmem_assembly_samples.txt`).
+
+## Troubleshooting
+
+- **Serratus DB credentials:** The Serratus RDS instance uses a public read-only password (`serratus`), which can also be overridden via `SERRATUS_DB_PASSWORD`.
+- **Quota errors in `$HOME`:** SLURM wrappers direct `XDG_CACHE_HOME` and `CONDA_PKGS_DIRS` to `$PWD/.cache` on scratch so Snakemake/Conda caches do not fill small home quotas.
+- **CheckV versioned subdirectory:** `checkv download_database` creates a versioned subfolder (`checkv-db-v1.5/`); point `configs/paths.yaml` at the parent directory (`run_checkv` resolves the inner folder automatically).
+
 ## Validation & Reproducibility
 
-Run the fast repository hygiene checks locally (no HPC or external databases required):
+Run the test and lint checks locally (no HPC or external databases required):
 
 ```bash
 python3 -m unittest discover -s tests -v
+# Or with dev extras installed (pytest, ruff, pandas, biopython):
+pytest -v
+ruff check tests workflow/phase1/scripts workflow/phase2/scripts
 ```
 
 - **External data only:** Raw reads, reference databases, container images (`*.sif`), cluster logs, and generated outputs are gitignored.
 - **Portable cluster wrappers:** All SLURM scripts resolve caches via `${XDG_CACHE_HOME:-$PWD/.cache}` and `${PIP_CACHE_DIR:-$PWD/.cache/pip}` and contain no hardcoded personal email addresses or home paths.
 
-## License & Citation
+## License, Changelog & Citation
 
-Licensed under the GNU General Public License v3.0 ([LICENSE](LICENSE)). Citation metadata is provided in [CITATION.cff](CITATION.cff).
+Licensed under the GNU General Public License v3.0 ([LICENSE](LICENSE)). See [CHANGELOG.md](CHANGELOG.md) for release history, [CONTRIBUTING.md](CONTRIBUTING.md) for contributor guidelines, and [CITATION.cff](CITATION.cff) for citation metadata.
