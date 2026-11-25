@@ -1,3 +1,11 @@
+"""Extract unique SRA run accessions from headerless MMseqs2 hit tables.
+
+Invoked via Snakemake `script:` by `rules/01.centroid_anchored.smk` and
+`rules/01.centroid_unanchored.smk`. Parses the `<run_id>_...` prefix from the
+first column of `snakemake.input.hits` and writes one accession per line to
+`snakemake.output[0]`.
+"""
+
 import pandas as pd
 import sys
 

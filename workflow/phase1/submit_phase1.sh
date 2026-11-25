@@ -13,6 +13,8 @@
 # SLURM job via --executor slurm, so the actual compute happens in those per-
 # rule jobs, not here.
 
+set -uo pipefail
+
 module purge
 module load snakemake/8.30.0
 export SNAKEMAKE_CONDA_FRONTEND=conda

@@ -1,3 +1,10 @@
+"""Merge Serratus sOTU discovery tables with NCBI SRA run metadata.
+
+Invoked via Snakemake `script:` by `rules/04.metadata_merge.smk`. Combines
+per-scenario Serratus hit matrices with fetched SRA metadata XML/TSV records
+and emits the unified annotated candidate table for the Phase 1 review gate.
+"""
+
 import os
 import sys
 import yaml

@@ -1,3 +1,11 @@
+"""Build the anchored sOTU-by-SRA alignment matrix from filtered MMseqs2 hits.
+
+Invoked via Snakemake `script:` by `rules/01.centroid_anchored.smk`. Joins
+`snakemake.input.hits` and `snakemake.input.unanchored` with Serratus metadata
+to produce a downstream-compatible matrix (emitting mandatory header columns
+even when zero hits pass filters).
+"""
+
 import os
 import sys
 import pandas as pd

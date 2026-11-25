@@ -1,9 +1,3 @@
-# Samples removed from data/test_run/manifest.csv (backup: data/test_run/manifest.csv.bak_2026-11-16_pre_highmem_removal).
-# Policy: a sample whose highmem rnaviral_assembly attempt fails is dropped, not retried.
-# To bring one back: reduce its input (coverage normalisation/subsampling), restore its manifest row.
-sample_id	removed	highmem_job	reason
-SRR14039623	2026-11-16	1127424	highmem TIMEOUT after 16 h (sonicmem5)
-SRR15462251	2026-11-16	1127439	highmem FAILED after 10.6 h (sonicmem3)
-SRR15462252	2026-11-16	1127444	highmem FAILED after 9.5 h (sonicmem3)
-SRR16767776	2026-11-16	1127417	highmem Cannot allocate memory after 14.2 h (sonicmem5)
-SRR16767818	2026-11-16	1127436	highmem No space left on device (node-local /tmp) after 11.4 h (sonicmem5)
+# Optional log of samples intentionally removed from the input manifest after
+# exhausting assembly resources. Kept as an audit trail for manuscript reporting.
+sample_id	removed	job_id	reason

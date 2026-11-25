@@ -11,6 +11,8 @@
 # SLURM job via --executor slurm, so the actual compute happens in those per-
 # rule jobs, not here.
 
+set -uo pipefail
+
 cd "$SLURM_SUBMIT_DIR"
 mkdir -p logs
 

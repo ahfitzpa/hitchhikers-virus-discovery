@@ -1,3 +1,11 @@
+"""Query Serratus/PalmDB for viral family sOTU centroids matching a discovery scenario.
+
+Invoked via Snakemake `script:` by `rules/01.base_discovery.smk`. Reads the active
+scenario configuration (`snakemake.config["scenarios"][snakemake.wildcards.mode]`),
+queries the Serratus PostgreSQL index and NCBI Entrez taxonomy, and writes filtered
+sOTU tables and anchor sequences to `snakemake.output`.
+"""
+
 import os
 import re
 import sys

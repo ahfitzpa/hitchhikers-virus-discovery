@@ -1,21 +1,5 @@
-# One-off list (2026-11-11): samples whose rnaviral_assembly is KNOWN to run out
-# of memory on ordinary `shared` nodes -- each failed 3 times in run 1099433
-# with "Cannot allocate memory" in spades-core. They go straight to the highmem
-# attempt instead of repeating two attempts that are already known to fail
-# (~16 h of wall clock each).
-#
-# This is not a policy: any sample NOT listed here still gets two ordinary
-# attempts first and only reaches highmem on its third. A listed sample gets
-# ONE highmem attempt -- a repeat of an identical attempt is refused, because
-# the answer to a failed highmem assembly is less input (coverage
-# normalisation or subsampling), not another 16 h on the same node.
-#
-# Deep, highly diverse libraries: soil/sediment/tick metagenomes and
-# whole-animal crayfish, 93-188 M read pairs after fastp.
-SRR14039623
-SRR14039946
-SRR15462251
-SRR15462252
-SRR16767776
-SRR16767818
-SRR5216637
+# Optional list of sample IDs (one per line) routed directly to the high-memory
+# SLURM partition for rnaviral_assembly instead of attempting ordinary shared
+# nodes first. Leave empty unless specific deep metagenomes exhaust shared RAM.
+# Example:
+# SRR12345678

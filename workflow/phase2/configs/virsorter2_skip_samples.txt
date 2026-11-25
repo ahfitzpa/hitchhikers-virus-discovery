@@ -1,25 +1,4 @@
-# Samples excluded from VIRSORTER_TARGETS (Snakefile_phase2).
-#
-# VirSorter2 is an annotation, never a gate: annotate_viral_positives takes the
-# score as a params path and merge_taxonomy_calls.py writes NA when it is
-# absent, so a skipped sample still gets its taxonomy_merged.tsv -- it just has
-# no vs2_max_score / virsorter2_viral column value.
-#
-# Measured over the 191 completed Hepeviridae samples: VirSorter2 is the sole
-# evidence for ZERO contigs (collect_viral_positives builds the candidate set
-# from Kraken2/geNomad/RdRpCATCH only, and VirSorter2 is joined on afterwards),
-# so skipping a sample cannot lose a viral call.
-#
-# Each sample below exhausted all three attempts at runtime=900 (15 h) without
-# finishing: 17 TIMEOUTs since 2026-11-14, ~90 CPU-hours per round, and they
-# held the whole workflow in stage 1 for 1 d 21 h.
-#
-# To re-enable one: delete its line. Consider subsampling its
-# filtered_contigs.fasta first -- these are the largest assemblies in the set.
+# Optional list of sample IDs excluded from VIRSORTER_TARGETS in Snakefile_phase2.
+# VirSorter2 is an annotation step (never a viral-discovery gate), so skipped
+# samples still receive full taxonomy_merged.tsv calls with NA for VirSorter2 columns.
 sample_id	excluded	reason
-SRR5216637	2026-11-18	3x TIMEOUT at runtime=900
-SRR6203186	2026-11-18	3x TIMEOUT at runtime=900
-SRR10402494	2026-11-18	3x TIMEOUT at runtime=900
-SRR13450176	2026-11-18	3x TIMEOUT at runtime=900
-SRR14039946	2026-11-18	3x TIMEOUT at runtime=900
-SRR16347793	2026-11-18	3x TIMEOUT at runtime=900
