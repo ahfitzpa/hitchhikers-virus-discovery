@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="plots/hitchhikers_logo.png" alt="A Hitchhiker's Guide to Virus Discovery" width="220" />
+</p>
+
 # A Hitchhiker's Guide to Virus Discovery
 
 Modular [Snakemake](https://snakemake.github.io/) workflows for large-scale RNA virus discovery in public Sequence Read Archive (SRA) datasets and local sequencing libraries, designed for unprivileged HPC clusters (SLURM + per-rule Conda/Mamba environments).
