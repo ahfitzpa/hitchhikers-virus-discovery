@@ -251,9 +251,12 @@ def filter_deletions() -> int:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
-    a = sub.add_parser("audit"); a.add_argument("--quiet", action="store_true")
+    a = sub.add_parser("audit")
+    a.add_argument("--quiet", action="store_true")
     sub.add_parser("filter-deletions")
-    r = sub.add_parser("retire"); r.add_argument("glob"); r.add_argument("--reason", required=True)
+    r = sub.add_parser("retire")
+    r.add_argument("glob")
+    r.add_argument("--reason", required=True)
     args = ap.parse_args()
     if args.cmd == "audit":
         return audit(args.quiet)
