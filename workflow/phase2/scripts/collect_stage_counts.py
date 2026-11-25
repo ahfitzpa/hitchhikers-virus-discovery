@@ -80,8 +80,8 @@ def coverage_counts(path: str, min_len: int) -> tuple[int, int]:
                     try:
                         if int(rec["contig_length"]) >= min_len:
                             long_enough += 1
-                    except (KeyError, ValueError):
-                        pass
+                    except (KeyError, ValueError) as exc:
+                        print(f"[collect_stage_counts] WARNING: skipping malformed row in {path}: {exc}", file=sys.stderr)
     except FileNotFoundError:
         return -1, -1
     return retained, long_enough
